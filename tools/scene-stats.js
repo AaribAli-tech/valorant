@@ -79,7 +79,7 @@ if (!NOBATCH && VAL.Instancing) {
   for (const g of [map.group, map.dressGroup, scene.getObjectByName('surroundings')]) {
     if (!g) continue;
     g.userData.batchable = true;
-    VAL.Instancing.optimize(g, { minCell: Number(arg('--minCell')) || 14, minPerBatch: Number(arg('--minPer')) || 600, maxBatches: Number(arg('--maxB')) || 12 });
+    VAL.Instancing.optimize(g, { minCell: Number(arg('--minCell')) || 14, minPerBatch: Number(arg('--minPer')) || 600, maxBatches: Number(arg('--maxB')) || 12, trisPerBatch: Number(arg('--trisPer')) || 12000, minSplitTris: Number(arg('--minSplit')) || 4000 });
   }
 }
 
@@ -207,8 +207,8 @@ console.log('');
 console.log(`per frame, avg over ${VANTAGE.length} vantage points (frustum culled):`);
 console.log(`  draw calls             ${fmt(Math.round(visDraws))}   (scene total ${fmt(visible)})`);
 console.log(`  vertices shaded        ${fmt(visVerts)}   (${(visVerts / 1e6).toFixed(2)} M)`);
-console.log(`SWEEP ${fmt(Math.round(visDraws))} draws / ${fmt(visVerts)} verts / ${fmt(visTris)} tris of ${fmt(visible)} draws`);
 console.log(`  triangles              ${fmt(visTris)}`);
+console.log(`SWEEP ${fmt(Math.round(visDraws))} draws / ${fmt(visVerts)} verts / ${fmt(visTris)} tris of ${fmt(visible)} total draws`);
 console.log(`  -> ${(visVerts / verts * 100).toFixed(0)}% of scene geometry is actually submitted`);
 if (problems.length) console.log('notes: ' + problems.join(' | '));
 

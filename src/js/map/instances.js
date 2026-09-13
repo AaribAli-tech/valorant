@@ -103,39 +103,62 @@ VAL.Instancing = (function () {
    * are collapsed into an index. Quads then cost 4 vertices instead of 6 and a
    * box 24 instead of 36, with identical output.
    */
+  /** Copy a geometry's vertices, expanded through its index, into flat arrays. */
+  function appendGeom(g, pos, nor, uv) {
+    const p = g.getAttribute('position');
+    if (!p) return;
+    const n = g.getAttribute('normal'), t = g.getAttribute('uv');
+    const index = g.index;
+    const count = index ? index.count : p.count;
+    const pa = p.array, na = n && n.array, ta = t && t.array;
+    for (let i = 0; i < count; i++) {
+      const j = index ? index.getX(i) : i;
+      pos.push(pa[j * 3], pa[j * 3 + 1], pa[j * 3 + 2]);
+      if (nor) nor.push(na ? na[j * 3] : 0, na ? na[j * 3 + 1] : 1, na ? na[j * 3 + 2] : 0);
+      if (uv) uv.push(ta ? ta[j * 3] : 0, ta ? ta[j * 3 + 1] : 0);
+    }
+  }
+
+  /**
+   * Turn a triangle soup into an indexed geometry: vertices that repeat exactly
+   * (every quad stores its shared corners twice, a box three times per edge) are
+   * stored once, so a quad costs 4 vertices instead of 6 and a box 24 instead of
+   * 36, with identical output.
+   */
+  function weldArrays(pos, nor, uv) {
+    const out = { pos: [], nor: [], uv: [], idx: [] };
+    const seen = new Map();
+    const keyOf = (x, y, z, nx, ny, nz, u, v) =>
+      Math.round(x * 1e4) + ',' + Math.round(y * 1e4) + ',' + Math.round(z * 1e4) + ',' +
+      Math.round(nx * 1e3) + ',' + Math.round(ny * 1e3) + ',' + Math.round(nz * 1e3) + ',' +
+      Math.round(u * 1e4) + ',' + Math.round(v * 1e4);
+    for (let j = 0; j < pos.length / 3; j++) {
+      const k = keyOf(pos[j * 3], pos[j * 3 + 1], pos[j * 3 + 2],
+        nor[j * 3], nor[j * 3 + 1], nor[j * 3 + 2], uv[j * 2], uv[j * 2 + 1]);
+      let at = seen.get(k);
+      if (at === undefined) {
+        at = out.pos.length / 3;
+        seen.set(k, at);
+        out.pos.push(pos[j * 3], pos[j * 3 + 1], pos[j * 3 + 2]);
+        out.nor.push(nor[j * 3], nor[j * 3 + 1], nor[j * 3 + 2]);
+        out.uv.push(uv[j * 2], uv[j * 2 + 1]);
+      }
+      out.idx.push(at);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out.pos), 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(out.nor), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(out.uv), 2));
+    geo.setIndex(out.idx);
+    geo.computeBoundingSphere();
+    return geo;
+  }
+
   function mergeGeoms(list, weld) {
     if (weld) {
-      const pos = [], nor = [], uv = [], idx = [];
-      const seen = new Map();
-      const keyOf = (x, y, z, nx, ny, nz, u, v) =>
-        `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)},` +
-        `${Math.round(nx * 1e3)},${Math.round(ny * 1e3)},${Math.round(nz * 1e3)},` +
-        `${Math.round(u * 1e4)},${Math.round(v * 1e4)}`;
-      let base = 0;
-      for (const g of list) {
-        const p = g.getAttribute('position'), n = g.getAttribute('normal'), t = g.getAttribute('uv');
-        if (!p) continue;
-        const count = g.index ? g.index.count : p.count;
-        for (let i = 0; i < count; i++) {
-          const j = g.index ? g.index.getX(i) : i;
-          const k = keyOf(p.getX(j), p.getY(j), p.getZ(j), n ? n.getX(j) : 0, n ? n.getY(j) : 1, n ? n.getZ(j) : 0, t ? t.getX(j) : 0, t ? t.getY(j) : 0);
-          let at = seen.get(k);
-          if (at === undefined) {
-            at = base + pos.length / 3;
-            seen.set(k, at);
-            pos.push(p.getX(j), p.getY(j), p.getZ(j));
-            nor.push(n ? n.getX(j) : 0, n ? n.getY(j) : 1, n ? n.getZ(j) : 0);
-            uv.push(t ? t.getX(j) : 0, t ? t.getY(j) : 0);
-          }
-          idx.push(at);
-        }
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
-      geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nor), 3));
-      geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
-      geo.setIndex(idx);
-      return geo;
+      const pos = [], nor = [], uv = [];
+      for (const g of list) appendGeom(g, pos, nor, uv);
+      return weldArrays(pos, nor, uv);
     }
     const ngs = list.map((g) => (g.index ? g.toNonIndexed() : g));
     let vc = 0; for (const g of ngs) vc += g.getAttribute('position').count;
@@ -282,28 +305,48 @@ VAL.Instancing = (function () {
    * greedy "balance the batch sizes" split scatters cells over the whole map and
    * every chunk then covers everything, so nothing is ever culled.
    */
-  function grid(items, centerOf, opts) {
+  /**
+   * Cell layout for a bucket of `units` items. Returns null when the bucket is
+   * too small to be worth splitting. `units` is instance counts for the batched
+   * shapes and triangle counts for merged ones - both are "how much is hanging
+   * off this draw call", which is the thing culling actually pays for.
+   */
+  function planFor(units, centers, opts) {
     opts = opts || {};
-    const minPer = opts.minPerBatch || 600;
     const maxB = opts.maxBatches || 12;
     const minCell = opts.minCell || opts.cell || 14;   // opts.cell is the old name
     let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
-    for (const it of items) {
-      const c = centerOf(it);
+    for (const c of centers) {
       if (c.x < minx) minx = c.x;
       if (c.x > maxx) maxx = c.x;
       if (c.z < minz) minz = c.z;
       if (c.z > maxz) maxz = c.z;
     }
-    const span = Math.max(maxx - minx, maxz - minz, 1);
-    const want = Math.min(maxB, Math.max(1, Math.ceil(items.length / minPer)));
-    if (want < 2) return [items];
-    const axis = Math.max(1, Math.round(Math.sqrt(want)));
-    const cell = Math.max(minCell, span / axis);
+    const spanX = Math.max(maxx - minx, 1), spanZ = Math.max(maxz - minz, 1);
+    const want = Math.min(maxB, Math.max(1, Math.ceil(units)));
+    if (want < 2) return null;
+    // spread the chunks along the bucket's own aspect ratio: a wall run that is
+    // 120 m long and 8 m deep wants 4 x 1 cells, not a square 2 x 2 grid
+    const nx = Math.max(1, Math.min(want, Math.round(Math.sqrt(want * spanX / spanZ))));
+    const nz = Math.max(1, Math.min(want, Math.ceil(want / nx)));
+    return {
+      minx: minx, minz: minz,
+      cellX: Math.max(minCell, spanX / nx), cellZ: Math.max(minCell, spanZ / nz),
+    };
+  }
+
+  const cellKey = (plan, x, z) =>
+    Math.floor((x - plan.minx) / plan.cellX) + ':' + Math.floor((z - plan.minz) / plan.cellZ);
+
+  /** Group items onto the plan's cells, one group per non-empty cell. */
+  function grid(items, centerOf, opts) {
+    opts = opts || {};
+    const plan = planFor(items.length / (opts.minPerBatch || 600), items.map(centerOf), opts);
+    if (!plan) return [items];
     const cells = new Map();
     for (const it of items) {
       const c = centerOf(it);
-      const key = Math.floor((c.x - minx) / cell) + ':' + Math.floor((c.z - minz) / cell);
+      const key = cellKey(plan, c.x, c.z);
       let g = cells.get(key);
       if (!g) cells.set(key, g = []);
       g.push(it);
@@ -440,20 +483,64 @@ VAL.Instancing = (function () {
 
   /**
    * Parts that are not repeated shapes stay merged - welded (a shared corner is
-   * stored once behind an index instead of once per triangle) and split over the
-   * same region grid the instance batches use, so roofs, floors and wall runs
-   * become cullable too instead of being one always-drawn blob per material.
+   * stored once behind an index instead of once per triangle) and split along the
+   * region grid so roofs, floors and wall runs become cullable too instead of one
+   * always-drawn blob per material.
+   *
+   * The split works on triangles, not on source parts: a floor or a facade run is
+   * a single hand-built geometry covering the whole map, so there are no parts to
+   * bin, and it is exactly the kind of mesh the frustum never rejects. Triangles
+   * themselves are never cut, so a chunk boundary only duplicates the few corners
+   * that straddle it - the picture is identical.
    */
   function mergedMeshes(items, material, flags, name, opts) {
+    opts = opts || {};
     const out = [];
-    for (const group of grid(items, (i) => i.center, opts)) {
-      const geo = mergeGeoms(group.map((i) => i.geo), true);
+    const emit = (geo, tag) => {
+      const p = geo && geo.getAttribute('position');
+      if (!p || !p.count) return;
       const mesh = new THREE.Mesh(geo, material);
       mesh.castShadow = flags.castShadow; mesh.receiveShadow = flags.receiveShadow;
-      mesh.name = name + '_' + group.length;
+      mesh.name = name + (tag ? '_' + tag : '');
       mesh.userData.noBatch = true;
       out.push(mesh);
+    };
+
+    let tris = 0;
+    for (const it of items) {
+      const g = it.geo;
+      tris += (g.index ? g.index.count : g.getAttribute('position').count) / 3;
     }
+    const plan = tris >= (opts.minSplitTris || 4000)
+      ? planFor(tris / (opts.trisPerBatch || 12000), items.map((i) => i.center), opts)
+      : null;
+
+    if (!plan) {                        // too little to be worth any splitting
+      const pos = [], nor = [], uv = [];
+      for (const it of items) appendGeom(it.geo, pos, nor, uv);
+      emit(weldArrays(pos, nor, uv));
+      return out;
+    }
+
+    const cells = new Map();
+    for (const it of items) {
+      const pos = [], nor = [], uv = [];
+      appendGeom(it.geo, pos, nor, uv);
+      const n = pos.length / 3;
+      for (let t = 0; t + 2 < n; t += 3) {
+        const key = cellKey(plan,
+          (pos[t * 3] + pos[t * 3 + 3] + pos[t * 3 + 6]) / 3,
+          (pos[t * 3 + 2] + pos[t * 3 + 5] + pos[t * 3 + 8]) / 3);
+        let cell = cells.get(key);
+        if (!cell) cells.set(key, cell = { pos: [], nor: [], uv: [] });
+        for (let v = t; v < t + 3; v++) {
+          cell.pos.push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
+          cell.nor.push(nor[v * 3], nor[v * 3 + 1], nor[v * 3 + 2]);
+          cell.uv.push(uv[v * 2], uv[v * 2 + 1]);
+        }
+      }
+    }
+    for (const [key, cell] of cells) emit(weldArrays(cell.pos, cell.nor, cell.uv), key);
     return out;
   }
 
@@ -596,9 +683,11 @@ VAL.Instancing = (function () {
 
       const key = bucketKey(node);
       let mk = merges.get(key);
-      if (!mk) merges.set(key, mk = { material: node.material, items: [], castShadow: node.castShadow, receiveShadow: node.receiveShadow });
+      if (!mk) merges.set(key, mk = { material: node.material, items: [], castShadow: node.castShadow, receiveShadow: node.receiveShadow, tris: 0, verts: 0, bytes: 0 });
       mk.items.push(Object.assign({ node }, baked(g, ctx)));
-      out.bytesBefore += attrBytes(g);
+      mk.tris += (g.index ? g.index.count : pos.count) / 3;
+      mk.verts += pos.count;
+      mk.bytes += attrBytes(g);
     };
 
     collect(root, ID);
@@ -626,7 +715,12 @@ VAL.Instancing = (function () {
     }
 
     for (const mk of merges.values()) {
-      if (mk.items.length < 2) { out.kept += mk.items.length; continue; }   // nothing to win
+      // one small mesh is already a single draw call and splitting it only costs
+      // calls; a big one is worth re-cutting even on its own - which is exactly
+      // what the whole-map floor and roof slabs are
+      if (mk.items.length < 2 && mk.tris < (opts.minSplitTris || 4000)) { out.kept += mk.items.length; continue; }
+      out.vertsBefore += mk.verts;
+      out.bytesBefore += mk.bytes;
       const built = mergedMeshes(mk.items, mk.material,
         { castShadow: mk.castShadow, receiveShadow: mk.receiveShadow }, 'merged', opts);
       for (const mesh of built) {

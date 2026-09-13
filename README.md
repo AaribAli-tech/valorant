@@ -90,9 +90,13 @@ data, not just per triangle.
    scale → yaw → translate, and the same metre-based UV tiling the baked vertices
    used, so the walls look exactly as before.
 4. Geometry that is *not* a repeated shape (floors, roofs, wall runs) is welded
-   (shared corners behind an index: 24 vertices per box instead of 36) and re-cut
-   along the same region grid, so it is still one mesh per material per region
-   rather than one blob spanning the whole map.
+   (shared corners behind an index: 24 vertices per box instead of 36) and then
+   re-cut **per triangle** along the same region grid. That matters for the meshes
+   with no parts to bin - `buildFloor()` emits one hand-built 52,000-vertex slab
+   per material - and a mesh that big spans the whole map, so the frustum can
+   never reject it. Cutting on triangle centroids means no triangle is ever split,
+   so a chunk boundary just duplicates a few corners: the picture is identical,
+   and 31 % of the scene is now culled instead of 4 %.
 5. Anything animated or picked at runtime — doors, the spike, lights that toggle,
    character hitboxes, nav and collision volumes — is left exactly as authored, and
    gameplay code never touches a batched mesh.
@@ -102,11 +106,12 @@ Measured with `npm run stats` (Node + three r152, no browser, whole Ascent scene
 
 | | before | after | |
 |---|---|---|---|
-| draw calls | 1,011 | **385** | −61.9 % |
-| vertices submitted | 1,570,019 | **822,540** | −47.6 % |
-| vertex buffers on GPU | 47.9 MB | **9.9 MB** | −79.3 % |
-| per frame after frustum culling | 289 calls / 1.52 M verts | **159 calls / 0.66 M verts** | −45 % / −57 % |
-| triangles | 533,561 | 532,393 | unchanged, on purpose |
+| draw calls | 1,011 | **459** | −54.6 % |
+| vertices submitted | 1,570,019 | **769,920** | −51.0 % |
+| vertex buffers on GPU | 47.9 MB | **8.4 MB** | −82.4 % |
+| largest single mesh | 74,800 tris / 1.78 MB | **16,456 tris / 0.33 MB** | |
+| per frame after frustum culling | 289 calls / 1.52 M verts | **180 calls / 0.53 M verts** | −38 % / −65 % |
+| triangles | 533,561 | 531,451 | unchanged, on purpose |
 
 Instancing does not remove triangles — the walls are still there. It removes draw
 calls, per-object JS (matrix updates, raycast candidates) and VRAM, which is where
@@ -116,9 +121,11 @@ deleted.
 
 `npm run verify` proves the rewrite is lossless: it records every tagged placement
 the builders asked for, runs `optimize()`, then re-derives each placement from the
-instance attributes exactly as the vertex shader does and matches them one by one
-(~16.8k boxes per run, to within 1 cm, which is the float32 storage tolerance; the
-count itself drifts a little because prop placement is randomised per build).
+instance attributes exactly as the vertex shader does and matches them one by one, and checks that the
+total triangle count of the scene is *exactly* conserved (~530k before, identical
+after - nothing silently deleted, nothing duplicated). The per-run numbers move a
+little (~16.7k boxes, ±1 draw call) because prop placement is randomised on every
+build; the equality checks are what the exit code depends on.
 
 ### Tuning and escape hatch
 
@@ -127,11 +134,15 @@ count itself drifts a little because prop placement is randomised per build).
 ?quick=1&side=attack&mode=unrated   skip the lobby and jump into a round
 ```
 
-The region granularity lives in one place (`grid()` in `js/map/instances.js`,
-defaults `minCell 14`, `minPerBatch 600`, `maxBatches 12`) and
-`node tools/scene-stats.js --minPer 250 --maxB 40` sweeps it: smaller regions trade
-draw calls for culling, and on a map with Ascent's long sightlines the middle ground
-wins.
+One shared region plan (`planFor()` in `js/map/instances.js`) sizes the chunks for
+both paths - `minCell 14`, `minPerBatch 600` and `maxBatches 12` for instances,
+`minSplitTris 4000` and `trisPerBatch 12000` for merged leftovers. `npm run stats`
+takes overrides (`--trisPer 6000 --maxB 20 --minSplit 1500`) and prints the average
+visible draw calls and shaded vertices over eight vantage points, so the trade is
+measurable rather than guessed: on Ascent the curve is flat between 4k and 20k
+triangles per chunk - smaller regions buy culling that a 120 m map with long
+sightlines mostly cannot use, and every extra chunk costs a draw call in *both* the
+colour and the shadow pass.
 
 ## Controls (Valorant defaults)
 

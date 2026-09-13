@@ -146,6 +146,17 @@ const countLeftoverVerts = (root) => root.traverse((o) => {
 });
 for (const g of Object.values(roots)) countLeftoverVerts(g);
 
+/* ---------- 3b. nothing may be lost or invented: triangle conservation ---------- */
+const trisOf = (o) => {
+  const geo = o.geometry;
+  if (!o.isMesh || !geo || !geo.getAttribute('position')) return 0;
+  const t = geo.index ? geo.index.count : geo.getAttribute('position').count;
+  return (t / 3) * (geo.isInstancedBufferGeometry ? geo.instanceCount : 1);
+};
+const sumTris = (root) => { let n = 0; root.traverse((o) => { n += trisOf(o); }); return n; };
+const trisBefore = Object.values(roots).reduce((a, g) => a + sumTris(g), 0);
+// (trisAfter is taken after the pass below)
+
 /* ---------- 4. match authored boxes against instanced ones ---------- */
 const findMatch = (t) => {
   const cx = q(t.x), cy = q(t.y), cz = q(t.z);
@@ -187,6 +198,11 @@ for (const snap of snapshot) {
   }
 }
 
+const trisAfter = Object.values(roots).reduce((a, g) => a + sumTris(g), 0);
+const trisOk = trisAfter === trisBefore;
+console.log(`triangles: ${trisBefore.toLocaleString()} authored -> ${trisAfter.toLocaleString()} in the batched scene (${trisOk ? 'exactly conserved' : 'CHANGED'})`);
+console.log('');
+
 console.log(`tagged boxes expected from consumed meshes: ${boxes} (${degenerate} degenerate skipped, ${survived} left on kept meshes)`);
 console.log(`batches ${stats.batches}, instances ${instanced} (${madeBox} unit boxes, ${madeShape} other shapes), re-cut blobs ${stats.recut}, kept meshes ${stats.kept}`);
 console.log(`vertices: ${vertsBefore.toLocaleString()} authored -> ${vertsAfter.toLocaleString()} submitted`);
@@ -194,7 +210,7 @@ console.log(`instanced boxes matching their authored placement within ${TOL * 10
 if (VERBOSE && unmatched.length) {
   console.log('\nplacements with no instance:\n  ' + unmatched.slice(0, 12).join('\n  '));
 }
-const ok = matched === boxes && madeBox === matched;
+const ok = matched === boxes && madeBox === matched && trisOk;
 console.log('\n' + (ok
   ? 'PASS: the instanced scene is geometrically identical to the authored one'
   : `FAIL: ${boxes - matched} placements unmatched, ${madeBox - matched} instances unexpected`));
