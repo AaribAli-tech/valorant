@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1923">
+<meta name="description" content="VALORANT Ascent - a browser 5v5 tactical shooter fan recreation. Free to play, no install.">
+<title>VALORANT Ascent - play in your browser</title>
+<link rel="icon" href="assets/ui/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700;800&family=Anton&display=swap">
+<link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="ui-bg"><div class="bg-img"></div><div class="bg-scrim"></div></div>
+<div id="ui">
+
+  <!-- ===================== GATE ===================== -->
+  <div id="gate" class="screen active">
+    <div class="gate-inner">
+      <div class="val-logo big"><span class="v-mark"></span>VALORANT</div>
+      <div class="gate-sub">BROWSER REPLICA · ASCENT</div>
+      <div class="gate-bar"><div id="gate-fill"></div></div>
+      <div id="gate-msg">Loading…</div>
+      <button id="gate-btn" class="val-btn hidden">PRESS TO START</button>
+    </div>
+  </div>
+
+  <!-- ===================== LOBBY / HOME ===================== -->
+  <div id="screen-lobby" class="screen">
+    <div class="topbar">
+      <div class="tb-left">
+        <div class="tb-logo"><span class="v-mark"></span></div>
+        <div class="tb-menu">≡</div>
+        <div class="tb-missions">
+          <div><span class="ico-clock"></span> 0 / 2</div>
+          <div><span class="ico-clock"></span> 0 / 3</div>
+        </div>
+        <div class="tb-battlepass"><span class="ring"></span><span class="ring"></span></div>
+      </div>
+      <nav class="tb-nav">
+        <div class="tb-tab active" data-tab="home">HOME</div>
+        <div class="tb-tab" data-tab="collection">COLLECTION</div>
+        <div class="tb-play" id="btn-play"><span>PLAY</span></div>
+        <div class="tb-tab" data-tab="career">CAREER</div>
+        <div class="tb-tab" data-tab="store">STORE</div>
+      </nav>
+      <div class="tb-right">
+        <div class="cur"><span class="cur-ico vp"></span>0</div>
+        <div class="cur"><span class="cur-ico rp"></span>0</div>
+      </div>
+    </div>
+
+    <div class="lobby-left">
+      <div class="panel">
+        <div class="panel-title">PLAY TO UNLOCK FREE AGENTS<div class="panel-sub">800 XP TO GO</div></div>
+        <div class="unlock-row">
+          <div class="unlock-tile active"><div class="n">6</div><div class="bar"><i style="width:60%"></i></div><div class="tile ico-spray"></div></div>
+          <div class="unlock-tile"><div class="n">7</div><div class="bar"><i></i></div><div class="tile ico-rp"></div></div>
+          <div class="unlock-tile"><div class="n">8</div><div class="bar"><i></i></div><div class="tile ico-card"></div></div>
+          <div class="unlock-tile"><div class="n">9</div><div class="bar"><i></i></div><div class="tile ico-buddy"></div></div>
+          <div class="unlock-tile"><div class="n">10</div><div class="bar"><i></i></div><div class="tile ico-agent"></div></div>
+        </div>
+        <div class="panel-foot">VIEW DETAILS <span class="ext">⧉</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">MISSIONS</div>
+        <div class="missions" id="missions"></div>
+        <div class="panel-foot small"><span class="ico-clock"></span> DAILY EXPIRATION IN: <span id="daily-timer">18:09:29</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">FEATURED MODES</div>
+        <div class="modes">
+          <div class="mode-row" data-mode="unrated"><span class="mode-ico ico-unrated"></span><span class="mode-name">UNRATED</span><span class="mode-time">30-40 MINS</span></div>
+          <div class="mode-row" data-mode="spikerush"><span class="mode-ico ico-spike"></span><span class="mode-name">SPIKE RUSH</span><span class="mode-time">8-12 MINS</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lobby-center">
+      <div class="lobby-tip"><div>Play games to earn XP to unlock rewards and Agents</div></div>
+      <div class="lobby-stack">
+        <div class="val-logo huge">VALORANT<span class="tm">TM</span></div>
+        <div class="act-banner">IGNITION : ACT 1</div>
+      </div>
+      <img id="lobby-hero" class="lobby-hero" alt="">
+      <div class="lobby-news">
+        <div class="news-card"><div class="nc-art nc-ascent" id="nc-ascent"></div><div class="nc-tag">MAP</div><div class="nc-title">ASCENT</div><div class="nc-sub">Now in rotation</div></div>
+        <div class="news-card"><div class="nc-art nc-agent" id="nc-agent"></div><div class="nc-tag">AGENT</div><div class="nc-title">JETT</div><div class="nc-sub">Selected for your next match</div></div>
+        <div class="news-card"><div class="nc-art nc-mode" id="nc-mode"></div><div class="nc-tag">MODE</div><div class="nc-title">UNRATED</div><div class="nc-sub">5v5 · First to 13</div></div>
+      </div>
+    </div>
+
+    <aside class="social">
+      <div class="social-head"><span class="ico-social"></span> SOCIAL</div>
+      <div class="party">
+        <div class="pm"><div class="pm-av" data-agent="jett"></div><div class="pm-txt"><b>himlate</b><i>In Party (Unrated)</i></div></div>
+        <div class="pm"><div class="pm-av" data-agent="sova"></div><div class="pm-txt"><b>cherwood</b><i>In Party (Unrated)</i></div></div>
+        <div class="pm"><div class="pm-av leader" data-agent="sage"></div><div class="pm-txt"><b>sickeez</b><i>In Party (Unrated)</i></div></div>
+      </div>
+      <div class="social-group"><span class="cnt">0</span> FRIENDS <span class="chev">⌃</span></div>
+      <div class="social-group"><span class="cnt">16</span> OFFLINE <span class="chev down">⌄</span></div>
+      <div class="social-foot"><span class="ico-addfriend"></span><span class="ico-search"></span></div>
+    </aside>
+    <div class="party-bar">Party: <span class="chev">⌃</span></div>
+  </div>
+
+  <!-- ===================== PLAY (mode select) ===================== -->
+  <div id="screen-play" class="screen">
+    <div class="play-head"><div class="back" id="play-back">‹ BACK</div><div class="play-title">CHOOSE A GAME MODE</div></div>
+    <div class="mode-cards" id="mode-cards">
+      <div class="mode-card sel" data-mode="unrated"><div class="mc-art unrated"></div><div class="mc-name">UNRATED</div><div class="mc-desc">5v5 · Plant or defuse the Spike · First to 13</div></div>
+      <div class="mode-card" data-mode="competitive"><div class="mc-art comp"></div><div class="mc-name">COMPETITIVE</div><div class="mc-desc">Ranked 5v5 · First to 13 · Overtime</div></div>
+      <div class="mode-card" data-mode="spikerush"><div class="mc-art spike"></div><div class="mc-name">SPIKE RUSH</div><div class="mc-desc">Quick 4-round mode · Random weapons</div></div>
+      <div class="mode-card" data-mode="deathmatch"><div class="mc-art dm"></div><div class="mc-name">DEATHMATCH</div><div class="mc-desc">Free for all · Aim warm-up</div></div>
+    </div>
+    <div class="play-foot">
+      <div class="play-party"><div class="pp" data-agent="jett"></div><div class="pp" data-agent="sova"></div><div class="pp" data-agent="sage"></div><div class="pp empty">+</div><div class="pp empty">+</div></div>
+      <button class="val-btn primary" id="btn-start">START</button>
+    </div>
+  </div>
+
+  <!-- queue overlay -->
+  <div id="queue" class="hidden">
+    <div class="q-box"><div class="q-title">FINDING MATCH</div><div class="q-time" id="q-time">0:00</div><div class="q-mode" id="q-mode">UNRATED · ASCENT</div><div class="q-spin"></div><button class="val-btn ghost" id="q-cancel">CANCEL</button></div>
+  </div>
+  <div id="match-found" class="hidden"><div class="mf-inner"><div class="mf-title">MATCH FOUND</div><div class="mf-sub">ASCENT</div></div></div>
+
+  <!-- ===================== LOADING / VS SCREEN ===================== -->
+  <div id="screen-loading" class="screen">
+    <div class="ld-bg"></div>
+    <div class="ld-coord">45°26'BF" N 12°20'Q" E</div>
+    <div class="ld-map">ASCENT</div>
+    <div class="ld-mode" id="ld-mode">UNRATED</div>
+    <div class="ld-side left" id="ld-left-title">DEFENDING</div>
+    <div class="ld-side right" id="ld-right-title">ATTACKING</div>
+    <div class="ld-team left" id="ld-team-left"></div>
+    <div class="ld-vs"><span>VS</span></div>
+    <div class="ld-team right" id="ld-team-right"></div>
+    <div class="ld-foot"><div class="val-logo small"><span class="v-mark"></span>VALORANT</div><span class="sep">|</span><span class="url">PLAYVALORANT.COM</span></div>
+    <div class="ld-bar"><i id="ld-fill"></i></div>
+    <div class="ld-map-icon"></div>
+  </div>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud" class="hidden">
+    <canvas id="minimap" width="260" height="260"></canvas>
+    <div id="hud-location">Attacker Side Spawn</div>
+    <div id="hud-top">
+      <div class="team-strip left" id="team-left"></div>
+      <div class="score-block">
+        <div class="score left" id="score-left">0</div>
+        <div class="timer-box"><div id="hud-timer">1:40</div><div id="hud-spike-ico" class="hidden"></div></div>
+        <div class="score right" id="score-right">0</div>
+      </div>
+      <div class="team-strip right" id="team-right"></div>
+      <div id="phase-text"><div id="phase-title">BUY PHASE</div><div id="phase-sub">PRESS <b>B</b> TO BUY</div></div>
+    </div>
+    <div id="killfeed"></div>
+    <div id="comms"></div>
+    <div id="crosshair"><i class="ch in t"></i><i class="ch in b"></i><i class="ch in l"></i><i class="ch in r"></i><i class="ch out t"></i><i class="ch out b"></i><i class="ch out l"></i><i class="ch out r"></i><i id="hitmarker"></i></div>
+    <div id="announce" class="hidden"><div id="ann-title"></div><div id="ann-sub"></div></div>
+    <div id="progress" class="hidden"><div id="prog-label">PLANTING</div><div class="prog-bar"><i id="prog-fill"></i><b id="prog-half"></b></div></div>
+    <div id="prompt" class="hidden"><span class="key" id="prompt-key">F</span><span id="prompt-text">DEFUSE SPIKE</span></div>
+    <div id="spectator" class="hidden"><div class="spec-title">SPECTATING</div><div id="spec-name">himlate</div><div class="spec-hint">LEFT CLICK · NEXT PLAYER</div></div>
+    <div id="dmg-vignette"></div>
+    <div id="dmg-dirs"></div>
+    <div id="lowhp" class="hidden"></div>
+    <div id="hud-bottom">
+      <div class="hb-left">
+        <div class="hp-block"><div class="hp-ico"></div><div id="hud-hp">100</div><div class="hp-bar"><i id="hud-hp-fill"></i></div></div>
+        <div class="armor-block hidden" id="armor-block"><div class="armor-ico"></div><div id="hud-armor">25</div></div>
+      </div>
+      <div class="hb-center">
+        <div class="abil" data-slot="c"><div class="abil-ico ico-cloudburst"></div><div class="abil-key">C</div><div class="abil-pips" id="pips-c"></div></div>
+        <div class="abil" data-slot="q"><div class="abil-ico ico-updraft"></div><div class="abil-key">Q</div><div class="abil-pips" id="pips-q"></div></div>
+        <div class="abil" data-slot="e"><div class="abil-ico ico-tailwind"></div><div class="abil-key">E</div><div class="abil-pips" id="pips-e"></div></div>
+        <div class="abil ult" data-slot="x"><div class="abil-ico ico-bladestorm"></div><div class="abil-key">X</div><div class="abil-pips ult" id="pips-x"></div></div>
+      </div>
+      <div class="hb-right">
+        <div class="creds"><span class="cur-sym">¤</span><span id="hud-creds">800</span></div>
+        <div class="ammo-block"><div id="hud-weapon">CLASSIC</div><div class="ammo"><span id="hud-ammo">12</span><span class="ammo-sep">|</span><span id="hud-reserve">36</span></div><div class="fire-mode" id="hud-firemode">SEMI</div></div>
+        <div class="weapon-slots" id="weapon-slots"></div>
+      </div>
+    </div>
+    <div id="scoreboard" class="hidden"><div class="sb-inner"><div class="sb-head"><div class="sb-map">ASCENT</div><div class="sb-score"><span id="sb-left">0</span><span class="sb-dash">–</span><span id="sb-right">0</span></div><div class="sb-mode" id="sb-mode">UNRATED</div></div><table class="sb-table" id="sb-table"></table></div></div>
+    <div id="round-bar" class="hidden"></div>
+  </div>
+
+  <!-- ===================== BUY MENU ===================== -->
+  <div id="buymenu" class="hidden">
+    <div class="bm-close" id="bm-close">✕</div>
+    <div class="bm-profile">
+      <div class="bm-av av-jett"></div>
+      <div class="bm-creds-box"><div class="bm-min">MIN NEXT ROUND: <b id="bm-min">¤ 1,900</b> <span class="warn">!</span></div><div class="bm-creds">¤ <span id="bm-creds">0</span></div><div class="bm-loadout"><span class="lo-ico shield"></span><span class="lo-ico gun" id="bm-lo-gun"></span></div></div>
+      <div class="bm-requests"><button>LET'S BUY</button><button>I HAVE EXTRA CREDS</button><button>LET'S SAVE</button></div>
+    </div>
+    <div class="bm-grid">
+      <div class="bm-col" id="bm-sidearms"><div class="bm-cat">SIDEARMS</div></div>
+      <div class="bm-col2">
+        <div class="bm-col" id="bm-smgs"><div class="bm-cat">SMGS</div></div>
+        <div class="bm-col" id="bm-shotguns"><div class="bm-cat">SHOTGUNS</div></div>
+      </div>
+      <div class="bm-col" id="bm-rifles"><div class="bm-cat">RIFLES</div></div>
+      <div class="bm-col2">
+        <div class="bm-col" id="bm-snipers"><div class="bm-cat">SNIPER RIFLES</div></div>
+        <div class="bm-col" id="bm-heavies"><div class="bm-cat">MACHINE GUNS</div></div>
+      </div>
+      <div class="bm-col" id="bm-armor"><div class="bm-cat">ARMOR</div></div>
+    </div>
+    <div class="bm-abilities"><div class="bm-cat wide">ABILITIES</div>
+      <div class="bm-ab-row">
+        <div class="bm-ab owned"><div class="ab-ico ico-drift"></div><div class="ab-txt"><span>OWNED</span><b>DRIFT</b></div></div>
+        <div class="bm-ab" data-ab="c"><div class="ab-ico ico-cloudburst"></div><div class="ab-txt"><span>¤200</span><b>CLOUDBURST</b></div></div>
+        <div class="bm-ab" data-ab="q"><div class="ab-ico ico-updraft"></div><div class="ab-txt"><span>¤150</span><b>UPDRAFT</b></div></div>
+        <div class="bm-ab full"><div class="ab-ico ico-tailwind"></div><div class="ab-txt"><span>FULL</span><b>TAILWIND</b></div></div>
+      </div>
+    </div>
+    <div class="bm-detail" id="bm-detail"></div>
+    <div class="bm-timer">BUY PHASE <b id="bm-time">0:30</b></div>
+  </div>
+
+  <!-- ===================== ESC MENU ===================== -->
+  <div id="menu-esc" class="hidden">
+    <div class="esc-box">
+      <div class="esc-title">MENU</div>
+      <button class="val-btn wide" id="esc-resume">RESUME</button>
+      <div class="esc-row"><label>MOUSE SENSITIVITY</label><input type="range" id="opt-sens" min="0.1" max="2" step="0.05" value="0.4"><span id="opt-sens-v">0.40</span></div>
+      <div class="esc-row"><label>MASTER VOLUME</label><input type="range" id="opt-vol" min="0" max="1" step="0.05" value="0.8"><span id="opt-vol-v">80%</span></div>
+      <div class="esc-row"><label>MUSIC VOLUME</label><input type="range" id="opt-music" min="0" max="1" step="0.05" value="0.5"><span id="opt-music-v">50%</span></div>
+      <div class="esc-row"><label>CROSSHAIR COLOR</label><select id="opt-ch"><option value="#3ff4e8">CYAN</option><option value="#ffffff">WHITE</option><option value="#7fff3f">GREEN</option><option value="#ffe23f">YELLOW</option></select></div>
+      <div class="esc-controls">MOVE <b>WASD</b> · WALK <b>SHIFT</b> · CROUCH <b>CTRL</b> · JUMP <b>SPACE</b> · RELOAD <b>R</b> · BUY <b>B</b> · USE / PLANT / DEFUSE <b>F</b> · SPIKE <b>4</b> · KNIFE <b>3</b> · SCOREBOARD <b>TAB</b> · INSPECT <b>Y</b> · DROP <b>G</b> · ABILITIES <b>C Q E X</b></div>
+      <button class="val-btn ghost wide danger" id="esc-leave">LEAVE MATCH</button>
+    </div>
+  </div>
+
+  <!-- ===================== MATCH END ===================== -->
+  <div id="screen-end" class="screen">
+    <div class="end-title" id="end-title">VICTORY</div>
+    <div class="end-score"><span id="end-left">13</span><span class="end-dash">:</span><span id="end-right">7</span></div>
+    <div class="end-stats" id="end-stats"></div>
+    <button class="val-btn primary" id="end-continue">CONTINUE</button>
+  </div>
+</div>
+<div id="ui-fx">
+  <div id="ads-vignette"></div>
+  <div id="dmg-flash"></div>
+  <div id="scope" class="hidden"><div class="sc-lens"><div class="sc-glass"></div><i class="sc h"></i><i class="sc v"></i><i class="sc dot"></i><b class="sc-mil m1"></b><b class="sc-mil m2"></b><b class="sc-mil m3"></b></div><div class="sc-mask"></div></div>
+</div>
+<script src="js/lib/three.min.js"></script>
+<script src="js/lib/GLTFLoader.js"></script>
+<script src="js/lib/SkeletonUtils.js"></script>
+<script src="js/data/assets.js"></script>
+<script src="js/core/util.js"></script>
+<script src="js/core/input.js"></script>
+<script src="js/core/textures.js"></script>
+<script src="js/core/audio.js"></script>
+<script src="js/weapons/data.js"></script>
+<script src="js/weapons/models.js"></script>
+<script src="js/map/scenery.js"></script>
+<script src="js/map/scenery_props.js"></script>
+<script src="js/map/instances.js"></script>
+<script src="js/map/ascent_data.js"></script>
+<script src="js/map/dressing.js"></script>
+<script src="js/map/ascent.js"></script>
+<script src="js/map/nav.js"></script>
+<script src="js/entities/character4.js"></script>
+<script src="js/entities/player.js"></script>
+<script src="js/entities/bot.js"></script>
+<script src="js/game/combat.js"></script>
+<script src="js/game/brain.js"></script>
+<script src="js/game/abilities.js"></script>
+<script src="js/game/match.js"></script>
+<script src="js/ui/hud.js"></script>
+<script src="js/ui/buymenu.js"></script>
+<script src="js/ui/agent_art.js"></script>
+<script src="js/ui/lobby.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
