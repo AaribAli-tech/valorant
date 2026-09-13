@@ -41,6 +41,9 @@ jobs:
       - name: Instancing is geometrically lossless
         run: node tools/verify-instances.js
 
+      - name: Shadow volume follow logic
+        run: node tools/test-shadowfollow.js
+
       - name: Scene stays inside its budget
         run: node tools/scene-stats.js --against tools/baseline-map-stats.json --json scene-metrics.json
 

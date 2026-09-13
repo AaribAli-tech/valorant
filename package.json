@@ -8,9 +8,9 @@
     "build": "node tools/build.js",
     "dev": "node tools/serve.js --root src --dev",
     "start": "node tools/build.js && node tools/serve.js --root public",
-    "verify": "node tools/smoke.js --root public && node tools/verify-instances.js",
+    "verify": "node tools/smoke.js --root public && node tools/verify-instances.js && node tools/test-shadowfollow.js",
     "stats": "node tools/scene-stats.js --against tools/baseline-map-stats.json",
-    "test": "node tools/smoke.js && node tools/verify-instances.js && node tools/scene-stats.js --against tools/baseline-map-stats.json"
+    "test": "node tools/smoke.js && node tools/verify-instances.js && node tools/test-shadowfollow.js && node tools/scene-stats.js --against tools/baseline-map-stats.json"
   },
   "engines": {
     "node": ">=18"

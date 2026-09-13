@@ -23,6 +23,7 @@ VAL.App = (function () {
   function progress(p, msg) { $('gate-fill').style.width = Math.round(p * 100) + '%'; if (msg) U.text('gate-msg', msg); }
 
   async function init() {
+    const q = new URLSearchParams(location.search);
     const canvas = $('gl');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25)); renderer.setSize(innerWidth, innerHeight);
@@ -39,6 +40,13 @@ VAL.App = (function () {
     const sun = new THREE.DirectionalLight(0xfff0dc, 2.4); sun.position.set(-70, 110, 70); sun.castShadow = true; sun.shadow.mapSize.set(3072, 3072);
     const sc = sun.shadow.camera; sc.left = -95; sc.right = 95; sc.top = 95; sc.bottom = -95; sc.near = 10; sc.far = 400; sun.shadow.bias = -0.00035; sun.shadow.normalBias = 0.02;
     sun.target.position.set(14, 0, -45); scene.add(sun); scene.add(sun.target); app.sun = sun;
+    // ?shadowfit=35 trades distant shadows for a quarter of the shadow pass; see
+    // js/core/shadowfollow.js for the measured numbers and why it stays opt-in.
+    const shadowFit = Number(q.get('shadowfit')) || 0;
+    if (shadowFit > 0 && VAL.ShadowFollow) {
+      app.shadowFollow = VAL.ShadowFollow.create(sun, camera, { fit: shadowFit, lead: Number(q.get('shadowlead')) });
+      if (app.shadowFollow) console.info('[VAL.ShadowFollow] ±' + app.shadowFollow.fit + ' m volume, ' + app.shadowFollow.texel.toFixed(3) + ' m texel');
+    }
     sun.layers.enable(1);
     const hemi = new THREE.HemisphereLight(0xd6dcff, 0x8d7d68, 0.95); hemi.layers.enable(1); scene.add(hemi);
     progress(0.25, 'Building geometry…'); await tick();
@@ -95,7 +103,6 @@ VAL.App = (function () {
     window.addEventListener('resize', onResize); onResize();
     bindUI();
     app.lastT = performance.now(); requestAnimationFrame(loop);
-    const q = new URLSearchParams(location.search);
     if (q.get('quick')) { app.mode = q.get('mode') || 'unrated'; app.startSide = q.get('side') || (Math.random() < 0.5 ? 'attack' : 'defend'); if (VAL.Audio) { VAL.Audio.init(); VAL.Audio.setVolume({ master: 0.8, sfx: 1, music: 0.5 }); } startMatch(); }
     setInterval(() => { if (performance.now() - app.lastT > 250) loop(performance.now(), true); }, 100); // keep sim alive when tab hidden
   }
@@ -266,6 +273,7 @@ VAL.App = (function () {
     }
     if (app.sky && app.sky.update) app.sky.update(dt, app.sun ? app.sun.position : null);
     VAL.Input.endFrame();
+    if (app.shadowFollow) app.shadowFollow.update();
     if (!forced) renderAll();
   }
   function cinematic(dt) {

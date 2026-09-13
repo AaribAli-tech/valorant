@@ -162,6 +162,29 @@ triangles per chunk - smaller regions buy culling that a 120 m map with long
 sightlines mostly cannot use, and every extra chunk costs a draw call in *both* the
 colour and the shadow pass.
 
+## Verifying it by eye
+
+Every number above was measured without a browser (Node + the vendored three, so
+geometry, transforms and draw counts are proven; shaders are only generated and
+structurally checked). That leaves one class of bug the tools cannot see - a
+material that *looks* different - and it is worth two minutes in the preview:
+
+1. **Tile scale on a long wall** (A main, mid doors): UV tiling is re-derived per
+   instance from `iUv`, so a 16 m facade panel must tile exactly like its baked
+   equivalent - obvious if it looks stretched or checkerboarded.
+2. **Arch heads** (both site entrances, heaven): front and back rings differ only
+   by a baked offset, and each part is a separate instance of the same prototype.
+3. **A skyline window at a grazing angle** (spawn view): boxes and their frames
+   are one prototype, so a wrong `iSize` axis would show as a squashed frame.
+4. **Shadows on the same four spots** - the shader patch is mirrored into a
+   `customDepthMaterial`, so a mistake there shows as a missing or doubled shadow,
+   not a missing wall.
+5. **Anything that moves**: doors, the toggled barrier, bots walking through crates
+   (they collide with authored data, never with a batch).
+
+`?noinstance=1` side by side in a second tab is the fastest way to confirm all
+five, and `?stats=1` shows the cost while you look.
+
 ## Controls (Valorant defaults)
 
 | | |

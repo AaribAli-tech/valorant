@@ -60,7 +60,7 @@ for (const rel of scripts) {
 
 // What other modules reach for at boot and during a match.
 const EXPECTED = [
-  'U', 'Textures', 'Audio', 'Input',                       // core
+  'U', 'Textures', 'Audio', 'Input', 'ShadowFollow',                       // core
   'WEAPONS', 'WeaponModels', 'Characters',                 // entities
   'MapData', 'Scenery', 'Dressing', 'AscentMap', 'Nav', 'Instancing',   // map
   'Player', 'Bot', 'Combat', 'TeamBrain', 'Abilities', 'Match',         // game
