@@ -45,6 +45,7 @@ src/                       the site as it is deployed
   js/data/assets.js        manifest of the binary assets
   assets/                  3 GLB character/animation files, agent art, minimap
 tools/                     build + serve + measurement scripts (not shipped)
+.github/workflows/         CI: syntax, load order, instancing proof, scene budget
 public/                    build output (gitignored)
 vercel.json                static deploy: build command, output dir, cache headers
 VALORANT/                  the original single-file build, kept for reference
@@ -134,9 +135,22 @@ build; the equality checks are what the exit code depends on.
 ### Tuning and escape hatch
 
 ```
-?noinstance=1     ship the unbatched build (A/B against the numbers above)
+?noinstance=1     build the map the old way (A/B against the numbers above)
+?stats=1          start with the perf overlay on; F3 toggles it at any time
 ?quick=1&side=attack&mode=unrated   skip the lobby and jump into a round
 ```
+
+The overlay reads `renderer.info` after each frame, so it shows the draw calls and
+triangles the GPU really got - including the shadow pass - alongside the fps.
+`?noinstance=1&stats=1` against `?stats=1` is the whole experiment, in the corner of
+a running match, no devtools.
+
+The same numbers are a gate, not a report: `tools/perf-budget.json` holds ceilings
+(draw calls, vertices, GPU megabytes, culled per-frame counts) and
+`node tools/scene-stats.js` exits non-zero when the scene busts one - which is how
+"the batching stopped working" gets caught in CI (`.github/workflows/checks.yml`)
+instead of in a frame-rate complaint. Run `npm run stats` to see them; `--nobudget`
+disables the check while you are measuring on purpose.
 
 One shared region plan (`planFor()` in `js/map/instances.js`) sizes the chunks for
 both paths - `minCell 14`, `minPerBatch 600` and `maxBatches 12` for instances,

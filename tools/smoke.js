@@ -64,7 +64,7 @@ const EXPECTED = [
   'WEAPONS', 'WeaponModels', 'Characters',                 // entities
   'MapData', 'Scenery', 'Dressing', 'AscentMap', 'Nav', 'Instancing',   // map
   'Player', 'Bot', 'Combat', 'TeamBrain', 'Abilities', 'Match',         // game
-  'HUD', 'BuyMenu', 'AgentArt', 'Lobby',                    // ui
+  'HUD', 'BuyMenu', 'AgentArt', 'Lobby', 'Stats',           // ui
 ];
 const VAL = globalThis.VAL || {};
 const absent = EXPECTED.filter((k) => VAL[k] == null);

@@ -29,6 +29,7 @@ VAL.App = (function () {
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
     app.renderer = renderer;
+    if (VAL.Stats) VAL.Stats.attach(renderer, scene);   // F3 / ?stats=1 - no-op otherwise
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0xc9b8d8); app.scene = scene;
     buildEnvironment(renderer, scene);
     const camera = new THREE.PerspectiveCamera(71, innerWidth / innerHeight, 0.05, 700); scene.add(camera); app.camera = camera;
@@ -41,6 +42,10 @@ VAL.App = (function () {
     sun.layers.enable(1);
     const hemi = new THREE.HemisphereLight(0xd6dcff, 0x8d7d68, 0.95); hemi.layers.enable(1); scene.add(hemi);
     progress(0.25, 'Building geometry…'); await tick();
+    // Kick the character rigs off the wire now: unpacking the map costs about a
+    // second of CPU and the GLBs about a second of network, and preload() memoises
+    // its promise, so awaiting it below just picks up whatever already arrived.
+    const modelsReady = VAL.Characters && VAL.Characters.preload ? VAL.Characters.preload(window.__VAL_ASSETS.models) : null;
     app.map = VAL.AscentMap.build(scene);
     VAL.Nav.init(app.map);
     app.map.dress();
@@ -53,7 +58,8 @@ VAL.App = (function () {
     // calls and ~50 MB of vertex buffers to a few hundred calls and ~10 MB,
     // which is the difference between 40 fps and a locked frame rate on a laptop
     // iGPU. ?noinstance=1 replays the unbatched build for an A/B comparison.
-    if (VAL.Instancing && !/[?&]noinstance=1/.test(location.search)) {
+    const batchingOn = !/[?&]noinstance=1/.test(location.search);
+    if (VAL.Instancing && batchingOn) {
       VAL.Instancing.configure({ vsmShadows: renderer.shadowMap.type === THREE.VSMShadowMap });
       progress(0.6, 'Batching static geometry…'); await tick();
       const tb = performance.now();
@@ -65,13 +71,18 @@ VAL.App = (function () {
         for (const k in st) if (typeof st[k] === 'number') sum[k] = (sum[k] || 0) + st[k];
       }
       app.batching = sum;
+      if (VAL.Stats) VAL.Stats.setInfo({ batches: sum.batches, instances: sum.instances });
       console.info('[VAL.Instancing] map meshes ' + sum.meshesBefore + ' -> ' + sum.meshesAfter +
         ', ' + sum.instances + ' boxes instanced, ' + sum.merged + ' merged in ' +
         (performance.now() - tb).toFixed(0) + ' ms');
     }
+    if (VAL.Stats) {
+      VAL.Stats.setInfo({ batching: batchingOn });
+      VAL.Stats.note(batchingOn ? 'F3 toggles  ·  ?noinstance=1 to compare' : 'instancing OFF (?noinstance=1)');
+    }
     progress(0.7, 'Loading agent model…'); await tick();
     if (VAL.Characters && VAL.Characters.preload) {
-      try { await VAL.Characters.preload(window.__VAL_ASSETS.models); if (VAL.AgentArt && VAL.Characters.AGENTS) for (const id in VAL.AgentArt) if (VAL.Characters.AGENTS[id]) VAL.Characters.AGENTS[id].icon = VAL.AgentArt[id].icon; }
+      try { await (modelsReady || VAL.Characters.preload(window.__VAL_ASSETS.models)); if (VAL.AgentArt && VAL.Characters.AGENTS) for (const id in VAL.AgentArt) if (VAL.Characters.AGENTS[id]) VAL.Characters.AGENTS[id].icon = VAL.AgentArt[id].icon; }
       catch (e) { console.error('agent model failed to load', e); }
     }
     progress(0.75, 'Preparing agents…'); await tick();
@@ -242,6 +253,7 @@ VAL.App = (function () {
   function loop(now, forced) {
     if (!forced) requestAnimationFrame(loop);
     let dt = (now - app.lastT) / 1000; app.lastT = now; if (dt > 0.1) dt = 0.1; if (dt <= 0) return; app.time += dt;
+    if (VAL.Stats) VAL.Stats.frame(dt);
     if (app.queue) { app.queue.t += dt; U.text('q-time', U.fmtTime(app.queue.t)); if (app.queue.t >= app.queue.dur) matchFound(); }
     if (app.state === 'loading') { app.loadT += dt; const p = Math.min(1, app.loadT / 4.5); $('ld-fill').style.width = (p * 100) + '%'; if (p >= 1) startMatch(); }
     VAL.Input.setFallbackActive(app.state === 'match' && !app.escOpen && !VAL.BuyMenu.isOpen);

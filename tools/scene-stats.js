@@ -234,3 +234,40 @@ for (const r of rows.slice(0, 18)) {
 }
 
 
+
+/* --------------------------------------------------------------- the budget
+   A performance claim nobody re-checks is a performance claim that quietly dies
+   the next time someone adds a prop. These are the numbers the scene is allowed to
+   cost; over one of them and the run fails, naming the culprit. Limits live in
+   tools/perf-budget.json so they are easy to argue with in a diff, and
+   `--nobudget` turns the check off while you are measuring on purpose. */
+const budgetPath = path.join(ROOT, 'tools', 'perf-budget.json');
+const jsonOut = arg('--json');
+if (jsonOut) fs.writeFileSync(path.resolve(ROOT, String(jsonOut)), JSON.stringify(metrics, null, 2));
+
+if (!arg('--nobudget') && fs.existsSync(budgetPath)) {
+  const budget = JSON.parse(fs.readFileSync(budgetPath, 'utf8'));
+  const measured = {
+    maxDrawCalls: visible,
+    maxVertices: verts,
+    maxTriangles: tris,
+    maxGpuMegabytes: bytes / 1048576,
+    maxBuildMs: buildMs,
+    maxVisibleDrawCalls: Math.round(visDraws),
+    maxVisibleVertices: visVerts,
+  };
+  let bad = 0;
+  console.log('\nbudget (tools/perf-budget.json):');
+  for (const [k, v] of Object.entries(measured)) {
+    if (budget[k] == null) continue;
+    const over = v > budget[k];
+    if (over) bad++;
+    console.log(`  ${over ? 'FAIL' : 'ok  '}  ${k.replace(/^max/, '').padEnd(17)} ${fmt(Math.round(v)).padStart(10)} of ${fmt(budget[k])} allowed`);
+  }
+  if (bad) {
+    console.error(`\nbudget: ${bad} limit${bad > 1 ? 's' : ''} exceeded - if the change is intentional, raise tools/perf-budget.json in the same commit and say why`);
+    process.exitCode = 1;
+  } else {
+    console.log('  all limits respected');
+  }
+}

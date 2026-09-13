@@ -1,0 +1,16 @@
+{
+  "_comment": [
+    "Ceilings for the shipped Ascent scene, checked by tools/scene-stats.js (npm run stats).",
+    "They sit just above what the scene costs today, and far below what it cost before",
+    "static instancing - draw calls 1,011, vertices 1.56 M, 47.7 MB of vertex buffers -",
+    "so a change that quietly turns the batching off fails the run instead of merging.",
+    "Raise a number in the same commit that needs it, with the reason in the message."
+  ],
+  "maxDrawCalls": 550,
+  "maxVertices": 900000,
+  "maxTriangles": 600000,
+  "maxGpuMegabytes": 13,
+  "maxBuildMs": 4000,
+  "maxVisibleDrawCalls": 260,
+  "maxVisibleVertices": 750000
+}

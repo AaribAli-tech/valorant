@@ -217,7 +217,7 @@ function main() {
     'js/map/ascent.js', 'js/map/nav.js', 'js/entities/character4.js', 'js/entities/player.js',
     'js/entities/bot.js', 'js/game/combat.js', 'js/game/brain.js', 'js/game/abilities.js',
     'js/game/match.js', 'js/ui/hud.js', 'js/ui/buymenu.js', 'js/ui/agent_art.js',
-    'js/ui/lobby.js', 'js/main.js'].filter((rel) =>
+    'js/ui/stats.js', 'js/ui/lobby.js', 'js/main.js'].filter((rel) =>
       blocks.some((b) => b.rel === rel) || rel === 'js/data/assets.js'
     );
   const extra = blocks.map((b) => b.rel).filter((r) => !scripts.includes(r) && !r.includes('lib/'));

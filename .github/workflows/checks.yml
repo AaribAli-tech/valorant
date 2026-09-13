@@ -1,0 +1,52 @@
+name: checks
+
+# None of this needs a browser or the game's (zero) runtime dependencies: the map
+# is built in Node against the vendored three r152, so the two things that are easy
+# to break silently - the page's script order and the instancing pass - are checked
+# here instead of by eyeball. Vercel does not read this file.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # esbuild exists only to minify the output; the game needs nothing.
+      - name: Install build extras (optional)
+        run: npm install --no-audit --no-fund || echo "::notice::continuing without esbuild"
+
+      - name: Syntax check everything we ship
+        run: |
+          fail=0
+          for f in $(find src/js tools -name '*.js' -not -path 'src/js/lib/*'); do
+            node --check "$f" || { echo "::error file=$f::syntax error"; fail=1; }
+          done
+          exit $fail
+
+      - name: Build the deployable site
+        run: node tools/build.js
+
+      - name: Page scripts load in order and every module registers
+        run: node tools/smoke.js --root public
+
+      - name: Instancing is geometrically lossless
+        run: node tools/verify-instances.js
+
+      - name: Scene stays inside its budget
+        run: node tools/scene-stats.js --against tools/baseline-map-stats.json --json scene-metrics.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scene-metrics
+          path: scene-metrics.json
+          if-no-files-found: ignore
