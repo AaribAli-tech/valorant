@@ -740,7 +740,24 @@ VAL.Instancing = (function () {
     }
     for (const bk of batches.values()) if (bk.proto) out.protoBytes = (out.protoBytes || 0) + attrBytes(bk.proto.geometry);
     if (out.batches) out.bytesAfter += 840;   // the one shared unit box
-    for (const node of kill) if (node.parent) node.parent.remove(node);
+    for (const node of kill) {
+      const p = node.parent;
+      if (!p) continue;
+      // A consumed mesh can still be the parent of something this pass left alone -
+      // dressing nests a second crate inside the first one. Re-home those children
+      // with their world placement intact instead of dropping them on the floor with
+      // the mesh that held them up.
+      if (node.children.length) {
+        const m = new THREE.Matrix4().copy(p.matrixWorld).invert().multiply(node.matrixWorld);
+        for (let i = node.children.length - 1; i >= 0; i--) {
+          const ch = node.children[i];
+          p.add(ch);
+          ch.applyMatrix4(m);
+          out.reparented = (out.reparented || 0) + 1;
+        }
+      }
+      p.remove(node);
+    }
     out.meshesAfter = countMeshes(root);
     api.stats = out;
     return out;

@@ -211,9 +211,9 @@ function main() {
 
   /* ---- index.html ---------------------------------------------------- */
   const scripts = ['js/lib/three.min.js', 'js/lib/GLTFLoader.js', 'js/lib/SkeletonUtils.js',
-    'js/data/assets.js', 'js/core/util.js', 'js/core/input.js', 'js/core/textures.js',
+    'js/data/assets.js', 'js/core/util.js', 'js/core/input.js', 'js/core/textures.js', 'js/map/instances.js',
     'js/core/audio.js', 'js/weapons/data.js', 'js/weapons/models.js', 'js/map/scenery.js',
-    'js/map/scenery_props.js', 'js/map/instances.js', 'js/map/ascent_data.js', 'js/map/dressing.js',
+    'js/map/scenery_props.js', 'js/map/ascent_data.js', 'js/map/dressing.js',
     'js/map/ascent.js', 'js/map/nav.js', 'js/entities/character4.js', 'js/entities/player.js',
     'js/entities/bot.js', 'js/game/combat.js', 'js/game/brain.js', 'js/game/abilities.js',
     'js/game/match.js', 'js/ui/hud.js', 'js/ui/buymenu.js', 'js/ui/agent_art.js',
