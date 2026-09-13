@@ -126,17 +126,18 @@ deleted.
 
 `npm run verify` proves the rewrite is lossless: it records every tagged placement
 the builders asked for, runs `optimize()`, then re-derives each placement from the
-instance attributes exactly as the vertex shader does and matches them one by one, and checks that the
-total triangle count of the scene is *exactly* conserved (~530k before, identical
-after - nothing silently deleted, nothing duplicated). The per-run numbers move a
-little (~16.7k boxes, ±1 draw call) because prop placement is randomised on every
-build; the equality checks are what the exit code depends on.
+instance attributes exactly as the vertex shader does and matches them one by one.
+It also checks that the total triangle count of the scene is *exactly* conserved
+(~530k before, identical after - nothing silently deleted, nothing duplicated). The
+per-run numbers move a little (~16.7k boxes, ±1 draw call) because prop placement is
+randomised on every build; the equality checks are what the exit code depends on.
 
 ### Tuning and escape hatch
 
 ```
 ?noinstance=1     build the map the old way (A/B against the numbers above)
 ?stats=1          start with the perf overlay on; F3 toggles it at any time
+?shadowfit=35     trim the sun's shadow volume and let it follow the camera
 ?quick=1&side=attack&mode=unrated   skip the lobby and jump into a round
 ```
 
@@ -144,6 +145,29 @@ The overlay reads `renderer.info` after each frame, so it shows the draw calls a
 triangles the GPU really got - including the shadow pass - alongside the fps.
 `?noinstance=1&stats=1` against `?stats=1` is the whole experiment, in the corner of
 a running match, no devtools.
+
+`?shadowfit` is off by default and worth understanding before you keep it. The
+shadow map is a second render of every caster, and the game's sun covers the whole
+level at once - a static ±95 m box - so all ~350 casters are re-drawn every frame
+however short the view is. Shrinking that box to ±35 m around the *camera* cuts the
+pass by about a quarter, measured over eight vantage points:
+
+| shadow volume | shadow draws/frame | shadow tris/frame |
+|---|---|---|
+| ±95 m, fixed (today) | 310 | 355,958 |
+| ±45 m, following | 232 | 306,894 |
+| ±35 m, following | 193 | 265,802 |
+
+A quarter, not the half the box-size ratio promises, because the dense geometry
+lives in the near field - and that is exactly why the saving does not pay for the
+artefact: past the edge of the volume, shadows simply stop, which on a map with 60 m
+sightlines you will notice. The volume is snapped to the shadow map's own texel grid
+(`2 * fit / mapSize`, 23 mm at 3072²) so the edges do not crawl while you strafe,
+`?shadowlead=` slides the centre ahead of the camera, and only the box moves: the
+light vector and the near/far depth range stay as authored, so shadow direction and
+acne are unchanged. `node tools/test-shadowfollow.js` holds the follow logic down -
+a nudge smaller than a texel must not move the light *at all*, a real move must
+preserve the sun direction exactly, and a missing fit must be a no-op.
 
 The same numbers are a gate, not a report: `tools/perf-budget.json` holds ceilings
 (draw calls, vertices, GPU megabytes, culled per-frame counts) and
