@@ -24,7 +24,7 @@ const arg = (name, def) => {
 };
 
 const root = path.resolve(__dirname, '..', String(arg('root', ROOT_DEFAULT)));
-const port = Number(arg('port', process.env.PORT || 3000));
+let port = Number(arg('port', process.env.PORT || 3000));
 const dev = !!arg('dev', false);
 
 const TYPES = {
@@ -99,6 +99,17 @@ if (!fs.existsSync(root)) {
   process.exit(1);
 }
 
+server.on('error', (e) => {
+  if (e.code !== 'EADDRINUSE' || tries >= 8) {
+    console.error(`serve: ${e.code === 'EADDRINUSE' ? `port ${port} is busy` : e.message}`);
+    process.exit(1);
+  }
+  tries++;                       // another dev server is up: move along, do not fail
+  port = port + 1;
+  server.listen(port, '0.0.0.0');
+});
+
+let tries = 0;
 server.listen(port, '0.0.0.0', () => {
   console.log(`serving ${path.relative(process.cwd(), root) || '.'} on http://0.0.0.0:${port} (${dev ? 'dev, no caching' : 'prod caching'})`);
 });
