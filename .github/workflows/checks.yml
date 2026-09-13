@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # same major as the sandbox and Vercel's builder
 
       # esbuild exists only to minify the output; the game needs nothing.
       - name: Install build extras (optional)
