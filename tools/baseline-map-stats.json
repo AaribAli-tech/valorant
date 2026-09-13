@@ -1,11 +1,14 @@
 {
   "visible": 1011,
   "meshes": 1011,
-  "verts": 1570019,
-  "tris": 533561,
-  "bytes": 50240608,
+  "verts": 1557449,
+  "tris": 529387,
+  "bytes": 49959460,
   "instances": 0,
   "instancedMeshes": 0,
   "materials": 26,
-  "buildMs": 1083.088375
+  "buildMs": 1120.590225,
+  "visDraws": 289,
+  "visVerts": 1497543.625,
+  "visTris": 501940.5
 }

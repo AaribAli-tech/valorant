@@ -99,38 +99,45 @@ let tris = 0;
 let bytes = 0;
 let instances = 0;
 let instancedMeshes = 0;
+let instancingSaved = 0;
 const rows = [];
 const matNames = new Set();
-const geoCount = new Map();
+const attrSeen = new WeakSet();  // an attribute object is one GPU buffer, however many meshes share it
+const posUsers = new Map();      // shared prototypes: attribute -> { users, verts }
+const bytesOf = (a) => {
+  // BufferAttribute has no uuid in r152, so key on the object itself
+  if (!a || !a.array || attrSeen.has(a)) return 0;
+  attrSeen.add(a);
+  return a.array.byteLength;
+};
 
 scene.traverse((o) => {
   if (!o.isMesh) return;
   meshes++;
   if (o.visible) visible++;
   const g = o.geometry;
-  geoCount.set(g.uuid, (geoCount.get(g.uuid) || 0) + 1);
   matNames.add(o.material && o.material.name ? o.material.name : (o.material ? o.material.type : '-'));
   const pos = g.getAttribute('position');
   if (!pos) return;
+  const use = posUsers.get(pos) || { n: 0, verts: pos.count };
+  use.n++;
+  posUsers.set(pos, use);
   const inst = g.isInstancedBufferGeometry ? Math.max(1, g.instanceCount || 0) : 1;
-  if (inst > 1) { instancedMeshes++; instances += inst; }
+  if (inst > 1) { instancedMeshes++; instances += inst; instancingSaved += (inst - 1) * pos.count; }
   const vc = pos.count * inst;
   const triCount = (g.index ? g.index.count : pos.count) / 3 * inst;
   verts += vc;
   tris += triCount;
-  let b = 0;
-  Object.keys(g.attributes).forEach((n) => {
-    const a = g.getAttribute(n);
-    b += a.array.byteLength;   // an instanced attribute's array already covers all instances
-  });
+  let b = bytesOf(g.index);   // index ranges are real VRAM too
+  Object.keys(g.attributes).forEach((n) => { b += bytesOf(g.getAttribute(n)); });
   bytes += b;
   rows.push({ name: o.name || '(unnamed)', draw: 1, inst, verts: vc, tris: triCount, kb: b / 1024, cast: !!o.castShadow });
 });
 
 rows.sort((a, b) => b.tris - a.tris);
 
-const sharedGeos = [...geoCount.values()].filter((n) => n > 1).length;
-const dupVertsSaved = [...geoCount.entries()].reduce((acc, [, n]) => acc + (n > 1 ? n - 1 : 0), 0);
+let protos = 0, protoUsers = 0, sharedVertsSaved = 0;
+for (const [, use] of posUsers) if (use.n > 1) { protos++; protoUsers += use.n; sharedVertsSaved += (use.n - 1) * use.verts; }
 
 const fmt = (n) => n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
@@ -174,6 +181,7 @@ visDraws /= VANTAGE.length; visVerts /= VANTAGE.length; visTris /= VANTAGE.lengt
 const metrics = {
   visible, meshes, verts, tris, bytes, instances, instancedMeshes,
   materials: matNames.size, buildMs,
+  visDraws: Math.round(visDraws), visVerts, visTris,
 };
 
 const saveTo = arg('--save');
@@ -187,9 +195,14 @@ if (against) {
   const pc = (a, b) => (b ? ((a - b) / b) * 100 : 0);
   const arrow = (a, b) => `${pc(a, b) >= 0 ? '+' : ''}${pc(a, b).toFixed(1)}%`;
   console.log('\n=== vs baseline ===');
-  for (const k of ['visible', 'verts', 'tris', 'bytes', 'materials']) {
+  const LABEL = {
+    visible: 'draw calls  ', verts: 'vertices    ', tris: 'triangles     ',
+    bytes: 'gpu bytes   ', materials: 'materials     ',
+    visDraws: 'draws/frame ', visVerts: 'verts/frame ', visTris: 'tris/frame    ',
+  };
+  for (const k of ['visible', 'verts', 'tris', 'bytes', 'visDraws', 'visVerts', 'materials']) {
     if (base[k] == null) continue;
-    console.log(`  ${k.padEnd(10)} ${fmt(base[k])} -> ${fmt(metrics[k])}   ${arrow(metrics[k], base[k])}`);
+    console.log(`  ${LABEL[k] || k} ${fmt(base[k])} -> ${fmt(metrics[k])}   ${arrow(metrics[k], base[k])}`);
   }
   console.log('');
 }
@@ -199,16 +212,15 @@ console.log(`built in ${buildMs.toFixed(0)} ms`);
 console.log(`draw calls (meshes)      ${fmt(visible)}`);
 console.log(`vertices submitted       ${fmt(verts)}   (${(verts / 1e6).toFixed(2)} M)`);
 console.log(`triangles submitted      ${fmt(tris)}   (${(tris / 1e6).toFixed(2)} M)`);
-console.log(`vertex buffers on GPU    ${(bytes / 1048576).toFixed(2)} MB`);
-console.log(`instanced meshes         ${instancedMeshes}  (${fmt(instances)} instances)`);
-console.log(`shared geometries        ${sharedGeos} reused in ${dupVertsSaved} extra meshes`);
+console.log(`vertex buffers on GPU    ${(bytes / 1048576).toFixed(2)} MB   (unique attribute + index arrays)`);
+console.log(`instanced meshes         ${instancedMeshes}  (${fmt(instances)} instances, ${fmt(instancingSaved)} verts not duplicated)`);
+console.log(`shared prototypes        ${protos} geometries reused by ${protoUsers} meshes (${fmt(sharedVertsSaved)} verts stored once)`);
 console.log(`materials                ${matNames.size}`);
 console.log('');
 console.log(`per frame, avg over ${VANTAGE.length} vantage points (frustum culled):`);
 console.log(`  draw calls             ${fmt(Math.round(visDraws))}   (scene total ${fmt(visible)})`);
 console.log(`  vertices shaded        ${fmt(visVerts)}   (${(visVerts / 1e6).toFixed(2)} M)`);
 console.log(`  triangles              ${fmt(visTris)}`);
-console.log(`SWEEP ${fmt(Math.round(visDraws))} draws / ${fmt(visVerts)} verts / ${fmt(visTris)} tris of ${fmt(visible)} total draws`);
 console.log(`  -> ${(visVerts / verts * 100).toFixed(0)}% of scene geometry is actually submitted`);
 if (problems.length) console.log('notes: ' + problems.join(' | '));
 

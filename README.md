@@ -104,14 +104,18 @@ data, not just per triangle.
 Measured with `npm run stats` (Node + three r152, no browser, whole Ascent scene —
 `tools/baseline-map-stats.json` is the frozen pre-instancing build):
 
+(unique GPU buffers, index arrays included; run it yourself with `npm run stats` -
+the scene randomises prop placement per build, so the last digits move a little):
+
 | | before | after | |
 |---|---|---|---|
-| draw calls | 1,011 | **459** | −54.6 % |
-| vertices submitted | 1,570,019 | **769,920** | −51.0 % |
-| vertex buffers on GPU | 47.9 MB | **8.4 MB** | −82.4 % |
-| largest single mesh | 74,800 tris / 1.78 MB | **16,456 tris / 0.33 MB** | |
-| per frame after frustum culling | 289 calls / 1.52 M verts | **180 calls / 0.53 M verts** | −38 % / −65 % |
-| triangles | 533,561 | 531,451 | unchanged, on purpose |
+| draw calls | 1,011 | **460** | −54.5 % |
+| vertices submitted | 1,557,449 | **771,209** | −50.5 % |
+| vertex buffers on GPU | 47.7 MB | **9.6 MB** | −79.9 % |
+| largest single mesh | 119,664 tris / 11.2 MB buffer | **16,456 tris / 0.40 MB** | |
+| per frame after frustum culling | 289 calls / 1.50 M verts | **179 calls / 0.53 M verts** | −38 % / −65 % |
+| instancing reuse | - | 20,722 instances, 521k verts never duplicated | |
+| triangles | 529,387 | 532,117 | unchanged, on purpose |
 
 Instancing does not remove triangles — the walls are still there. It removes draw
 calls, per-object JS (matrix updates, raycast candidates) and VRAM, which is where
